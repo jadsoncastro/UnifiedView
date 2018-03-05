@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="src" path="src"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry kind="lib" path="/home/jadson/Jama/matlabcontrol-4.0.0.jar"/>
+	<classpathentry kind="lib" path="/home/jadson/Jama/Jama-1.0.3.jar"/>
+	<classpathentry kind="lib" path="/home/jadson/Jama/beansbinding-1.2.1.jar"/>
+	<classpathentry kind="output" path="bin"/>
+</classpath>
