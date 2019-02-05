@@ -25,7 +25,7 @@ public class Constraint {
 	// ------------------------------ CONSTRUCTORS ------------------------------
 	
 	/**
-	 * Creates a new constraint.
+	 * Creates a new constraint. 
 	 * @param pointA The first point involved in the constraint
 	 * @param pointB The second point involved in the constraint
 	 * @param type The CONSTRAINT_TYPE of the constraint

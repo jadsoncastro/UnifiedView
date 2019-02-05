@@ -7,7 +7,7 @@ import java.util.Map;
 
 /**
  * An undirected graph, with weights assigned to each edge.  Vertices in the graph are 0 indexed.
- * @author zjullion
+ * @author zjullion 
  */
 public class UndirectedGraph implements java.io.Serializable
 {

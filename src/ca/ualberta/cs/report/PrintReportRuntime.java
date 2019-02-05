@@ -22,7 +22,7 @@ import com.sun.xml.internal.fastinfoset.tools.PrintTable;
 import javafx.util.Pair;
 import ca.ualberta.cs.distance.DistanceCalculator;
 import ca.ualberta.cs.distance.EuclideanDistance;
-import ca.ualberta.cs.experiment.SimpleStatistics;
+import ca.ualberta.cs.experimentSemiSupClassification.SimpleStatistics;
 import ca.ualberta.cs.model.DescriptionAlgorithms;
 
 /** Statistics analsys (Mean and SD) for each algorithm over all data sets.

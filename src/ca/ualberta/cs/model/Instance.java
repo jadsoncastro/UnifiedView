@@ -9,7 +9,7 @@ import java.util.ArrayList;
  * and a flag showing if it is pre-labeled or not.
  */
 
-public class Instance implements Comparable<Instance>{
+public class Instance implements Comparable <Instance>{
 
 	// ------------------------------ PRIVATE VARIABLES ------------------------------
 
@@ -81,6 +81,16 @@ public class Instance implements Comparable<Instance>{
 	public boolean isProcessed() 
 	{
 		return isProcessed;
+	}
+	
+	public boolean wasNotCoreDistanceSet() 
+	{
+		if(coreDistance == -1)
+		{
+			return true;
+		}
+		
+		return false;
 	}
 
 	public void setProcessed(boolean isProcessed) 

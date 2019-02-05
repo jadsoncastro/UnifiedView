@@ -47,7 +47,7 @@ public class HDBSCANAptsRunner {
 	private static final String MANHATTAN_DISTANCE    = "manhattan";
 	private static final String SUPREMUM_DISTANCE 	  = "supremum";
 
-	/**
+	/** 
 	 * Runs the HDBSCANApts algorithm given an input data set file and a value for minPoints and
 	 * minClusterSize.  Note that the input file must be a comma-separated value (CSV) file, and
 	 * that all of the output files will be CSV files as well.  The flags "file=", 

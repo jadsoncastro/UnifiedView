@@ -31,7 +31,7 @@ import ssExtraction.SemiWeight;
 
 /**
  * Implementation of the HDBSCAN* algorithm, which is broken into several methods.
- * @author zjullion
+ * @author zjullion 
  */
 public class HDBSCANStar implements Serializable
 {
@@ -309,6 +309,7 @@ public class HDBSCANStar implements Serializable
 
 				double distance = distanceFunction.computeDistance(dataSet[currentPoint], dataSet[neighbor]);
 
+
 				double mutualReachabiltiyDistance = distance;
 				if (coreDistances[currentPoint] > mutualReachabiltiyDistance)
 					mutualReachabiltiyDistance = coreDistances[currentPoint];
@@ -526,7 +527,7 @@ public class HDBSCANStar implements Serializable
 		//A list of clusters in the cluster tree, with the 0th cluster (noise) null:
 		ArrayList<Cluster> clusters = new ArrayList<Cluster>();
 		clusters.add(null);
-		clusters.add(new Cluster(1, null, Double.NaN, mst.getNumVertices(), null));
+		clusters.add(new Cluster(1, null, Double.NaN, mst.getNumVertices()));
 
 		//Calculate number of constraints satisfied for cluster 1:
 		TreeSet<Integer> clusterOne = new TreeSet<Integer>();
@@ -537,12 +538,14 @@ public class HDBSCANStar implements Serializable
 		TreeSet<Integer> affectedClusterLabels = new TreeSet<Integer>();
 		TreeSet<Integer> affectedVertices = new TreeSet<Integer>();		
 
-		while(currentEdgeIndex >= 0) {
+		while(currentEdgeIndex >= 0) 
+		{
 			double currentEdgeWeight = mst.getEdgeWeightAtIndex(currentEdgeIndex);
 			ArrayList<Cluster> newClusters = new ArrayList<Cluster>();
 
 			//Remove all edges tied with the current edge weight, and store relevant clusters and vertices:
-			while (currentEdgeIndex >= 0 && mst.getEdgeWeightAtIndex(currentEdgeIndex) == currentEdgeWeight){
+			while (currentEdgeIndex >= 0 && mst.getEdgeWeightAtIndex(currentEdgeIndex) == currentEdgeWeight)
+			{
 				int firstVertex = mst.getFirstVertexAtIndex(currentEdgeIndex);
 				int secondVertex = mst.getSecondVertexAtIndex(currentEdgeIndex);
 				mst.getEdgeListForVertex(firstVertex).remove((Integer)secondVertex);
@@ -1243,7 +1246,7 @@ public class HDBSCANStar implements Serializable
 
 		if (clusterLabel != 0)
 		{
-			Cluster cluster = new Cluster(clusterLabel, parentCluster, edgeWeight, points.size(), points);
+			Cluster cluster = new Cluster(clusterLabel, parentCluster, edgeWeight, points.size());
 			cluster.setObjects(points);
 			return cluster;
 		}
@@ -1309,9 +1312,10 @@ public class HDBSCANStar implements Serializable
 			}
 		}
 
-		for (Cluster parent : parents) {
-			parent.releaseVirtualChildCluster();
-		}
+		// Commented by Jadson in 14/03/2018
+//		for (Cluster parent : parents) {
+//			parent.releaseVirtualChildCluster();
+//		}
 	}
 
 

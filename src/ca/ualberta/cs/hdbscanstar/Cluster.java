@@ -12,7 +12,7 @@ import java.util.TreeSet;
  * An HDBSCAN* cluster, which will have a birth level, death level, stability, and constraint 
  * satisfaction once fully constructed.
  * @author zjullion
- * @author jadson (updated in 24/09/2016)
+ * @author jadson
  */
 public class Cluster implements java.io.Serializable
 {
@@ -35,32 +35,33 @@ public class Cluster implements java.io.Serializable
 	private int propagatedNumConstraintsSatisfied;
 	private TreeSet<Integer> virtualChildCluster;
 
+	// Attribute included by @author jadson
+	private TreeMap<Integer, Integer> classDistributionInNode;	// <Integer, Integer> == <class, count of objects of that class>
+	private TreeMap<Integer, Integer> classDistributionInVirtualChild;
 
-	private TreeMap<Integer, TreeSet<Integer>> preLabeledObjectsInNode;
+	// Attribute included by @author jadson
+	private int numberOfLabeledInNode;
 
+	/*Attribute included by @author jadson
+	 * Define the variable to store the Bcubed of a cluster with respect to the labeled objects
+	 */
+	private double bCubed;
+	private double propagatedBCubed;
 
-	//Define the variable to store the consistency of a cluster with respect to the labeled objects
-	private double consistencyIndex;
-	private double propagatedConsistencyIndex;	
+	//Define the mixed stability function (stability and bcubed index) (Attribute included by @author jadson)
+	private double mixStabilityBcubed;
+	private double propagatedMixStabilityBcubed;	
 
+	//Define the mix between stability and constraints
+	private double mixStabilityConstraints;
+	private double propagatedMixStabilityConstraints;	
 
-	//Define the mixed stability function (stability and consistency index)
-	private double mixedStability;
-	private double propagatedMixedStability;	
-
-	//Define the mixed stability function for the constraint based approach (stability and consistency index)
-	private double mixedForConstraints;
-	private double propagatedMixedForConstraints;	
-
-
+	
 	private Cluster parent;
 	private boolean hasChildren;
 	public ArrayList<Cluster> propagatedDescendants;
 
-	// Attribute include by @author jadson
-	private TreeSet<Integer> objectsAtBirthLevel;
 	private TreeSet<Integer> children;
-
 
 	//The attribute below (objects) was created by Fernando S. de Aguiar Neto
 	private TreeSet<Integer> objects; //Objects that belong to this cluster i.e. become noise before/at the death level of this cluster.
@@ -77,7 +78,7 @@ public class Cluster implements java.io.Serializable
 	 * @param birthLevel The MST edge level at which this cluster first appeared
 	 * @param numPoints The initial number of points in this cluster
 	 */
-	public Cluster(int label, Cluster parent, double birthLevel, int numPoints, TreeSet<Integer> pointsAtBirthLevel) 
+	public Cluster(int label, Cluster parent, double birthLevel, int numPoints) 
 	{
 		this.label = label;
 		this.birthLevel = birthLevel;
@@ -94,10 +95,19 @@ public class Cluster implements java.io.Serializable
 		this.propagatedNumConstraintsSatisfied = 0;
 		this.virtualChildCluster = new TreeSet<Integer>();
 
-		this.consistencyIndex = 0.0;
-		this.propagatedConsistencyIndex= 0.0;
+		this.bCubed= 0.0;
+		this.propagatedBCubed = 0.0;
 
-		this.preLabeledObjectsInNode = new TreeMap<Integer, TreeSet<Integer>>();
+		this.classDistributionInNode = new TreeMap<Integer, Integer>();
+		this.classDistributionInVirtualChild = new TreeMap<Integer, Integer>();
+
+		this.numberOfLabeledInNode = 0;
+
+		this.mixStabilityBcubed =0.0;
+		this.propagatedMixStabilityBcubed = 0.0;
+
+		this.mixStabilityConstraints = 0.0;
+		this.propagatedMixStabilityConstraints = 0.0;
 
 		this.objects = new TreeSet<Integer>();
 
@@ -109,7 +119,6 @@ public class Cluster implements java.io.Serializable
 		this.propagatedDescendants = new ArrayList<Cluster>(1);
 
 		this.children = new TreeSet<Integer>();
-		this.objectsAtBirthLevel = pointsAtBirthLevel;
 	}
 
 
@@ -140,9 +149,11 @@ public class Cluster implements java.io.Serializable
 	 * Additionally, this cluster propagates the lowest death level of any of its descendants to its
 	 * parent.
 	 */
+
 	public void propagate()
 	{
-		if (this.parent != null) {
+		if (this.parent != null)
+		{
 
 			//Propagate lowest death level of any descendants:
 			if (this.propagatedLowestChildDeathLevel == Double.MAX_VALUE)
@@ -152,19 +163,22 @@ public class Cluster implements java.io.Serializable
 				this.parent.propagatedLowestChildDeathLevel = this.propagatedLowestChildDeathLevel;
 
 			//If this cluster has no children, it must propagate itself:
-			if (!this.hasChildren) {
+			if (!this.hasChildren)
+			{
 				this.parent.propagatedNumConstraintsSatisfied+= this.numConstraintsSatisfied;
 				this.parent.propagatedStability+= this.stability;
 				this.parent.propagatedDescendants.add(this);
 			}
 
-			else if (this.numConstraintsSatisfied > this.propagatedNumConstraintsSatisfied) {
+			else if (this.numConstraintsSatisfied > this.propagatedNumConstraintsSatisfied) 
+			{
 				this.parent.propagatedNumConstraintsSatisfied+= this.numConstraintsSatisfied;
 				this.parent.propagatedStability+= this.stability;
 				this.parent.propagatedDescendants.add(this);
 			}
 
-			else if (this.numConstraintsSatisfied < this.propagatedNumConstraintsSatisfied) {
+			else if (this.numConstraintsSatisfied < this.propagatedNumConstraintsSatisfied)
+			{
 				this.parent.propagatedNumConstraintsSatisfied+= this.propagatedNumConstraintsSatisfied;
 				this.parent.propagatedStability+= this.propagatedStability;
 				this.parent.propagatedDescendants.addAll(this.propagatedDescendants);
@@ -173,20 +187,22 @@ public class Cluster implements java.io.Serializable
 			else if (this.numConstraintsSatisfied == this.propagatedNumConstraintsSatisfied) 
 			{
 
-				if (this.stability >= this.propagatedStability) {
+				if (this.stability >= this.propagatedStability)
+				{
 					this.parent.propagatedNumConstraintsSatisfied+= this.numConstraintsSatisfied;
 					this.parent.propagatedStability+= this.stability;
 					this.parent.propagatedDescendants.add(this);
 				}
 
-				else {
+				else 
+				{
 					this.parent.propagatedNumConstraintsSatisfied+= this.propagatedNumConstraintsSatisfied;
 					this.parent.propagatedStability+= this.propagatedStability;
 					this.parent.propagatedDescendants.addAll(this.propagatedDescendants);
 				}	
 			}	
 		}
-	}	
+	}
 
 
 	//---------------------------------------------------------------------------------------------------
@@ -199,178 +215,9 @@ public class Cluster implements java.io.Serializable
 	 * Additionally, this cluster propagates the lowest death level of any of its descendants to its
 	 * parent.
 	 */
-	public void propagateSupervised()
+	public void propagateBCubed()
 	{
-		if (this.parent != null) {
-
-			//Propagate lowest death level of any descendants:
-			if (this.propagatedLowestChildDeathLevel == Double.MAX_VALUE)
-				this.propagatedLowestChildDeathLevel = this.deathLevel;
-
-			if (this.propagatedLowestChildDeathLevel < this.parent.propagatedLowestChildDeathLevel)
-				this.parent.propagatedLowestChildDeathLevel = this.propagatedLowestChildDeathLevel;
-
-			//If this cluster has no children, it must propagate itself:
-			if (!this.hasChildren) {
-				this.parent.propagatedConsistencyIndex+= this.consistencyIndex;
-				this.parent.propagatedStability+= this.stability;
-				this.parent.propagatedDescendants.add(this);
-			}
-
-			else if (this.consistencyIndex > this.propagatedConsistencyIndex) {
-				this.parent.propagatedConsistencyIndex+= this.consistencyIndex;
-				this.parent.propagatedStability+= this.stability;
-				this.parent.propagatedDescendants.add(this);
-			}
-
-			else if (this.consistencyIndex < this.propagatedConsistencyIndex) {
-				this.parent.propagatedConsistencyIndex+= this.propagatedConsistencyIndex;
-				this.parent.propagatedStability+= this.propagatedStability;
-				this.parent.propagatedDescendants.addAll(this.propagatedDescendants);
-			}
-
-			else if (this.consistencyIndex == this.propagatedConsistencyIndex) 
-			{
-
-				if (this.stability >= this.propagatedStability) {
-					this.parent.propagatedStability+= this.stability;
-					this.parent.propagatedDescendants.add(this);
-				}
-
-				else {
-					this.parent.propagatedConsistencyIndex+= this.propagatedConsistencyIndex;
-					this.parent.propagatedStability+= this.propagatedStability;
-					this.parent.propagatedDescendants.addAll(this.propagatedDescendants);
-				}	
-			}	
-		}
-	}	
-
-
-
-	/**
-	 * Created by Jadson Castro Gertrudes 26/09/2016
-	 * This cluster will propagate itself to its parent if its purity index is
-	 * higher or equal than the purity of propagated ones.  Otherwise, this cluster propagates its
-	 * propagated descendants.
-	 * TODO: update function to store the propagated purity and the propagated stability
-	 */
-
-	public void propagateMixed()
-	{
-		if (this.parent != null) {
-
-			//Propagate lowest death level of any descendants:
-			if (this.propagatedLowestChildDeathLevel == Double.MAX_VALUE)
-				this.propagatedLowestChildDeathLevel = this.deathLevel;
-
-			if (this.propagatedLowestChildDeathLevel < this.parent.propagatedLowestChildDeathLevel)
-				this.parent.propagatedLowestChildDeathLevel = this.propagatedLowestChildDeathLevel;
-
-			//If this cluster has no children, it must propagate itself:
-			if (!this.hasChildren) {
-				this.parent.propagatedMixedStability+= this.mixedStability;
-				this.parent.propagatedStability+= this.stability;
-				this.parent.propagatedDescendants.add(this);
-			}
-			else if (this.mixedStability > this.propagatedMixedStability)
-			{
-				this.parent.propagatedMixedStability += this.mixedStability;
-				this.parent.propagatedStability+= this.stability;
-				this.parent.propagatedDescendants.add(this);
-			}
-
-			else if (this.mixedStability < this.propagatedMixedStability) {
-				this.parent.propagatedMixedStability += this.propagatedMixedStability;
-				this.parent.propagatedStability+= this.propagatedStability;
-				this.parent.propagatedDescendants.addAll(this.propagatedDescendants);
-			}
-
-			else if (this.mixedStability == this.propagatedMixedStability) 
-			{
-
-				if (this.stability >= this.propagatedStability) {
-					this.parent.propagatedStability+= this.stability;
-					this.parent.propagatedDescendants.add(this);
-				}
-
-				else {
-					this.parent.propagatedMixedStability+= this.propagatedMixedStability;
-					this.parent.propagatedStability+= this.propagatedStability;
-					this.parent.propagatedDescendants.addAll(this.propagatedDescendants);
-				}	
-			}	
-		}
-	}	
-
-
-	/**
-	 * Created by Jadson Castro Gertrudes 11/06/2017
-	 * This cluster will propagate itself to its parent if its purity index is
-	 * higher or equal than the purity of propagated ones.  Otherwise, this cluster propagates its
-	 * propagated descendants.
-	 * TODO: update function to store the propagated purity and the propagated stability
-	 */
-
-	public void propagateMixedForConstraints()
-	{
-		if (this.parent != null) {
-
-			//Propagate lowest death level of any descendants:
-			if (this.propagatedLowestChildDeathLevel == Double.MAX_VALUE)
-				this.propagatedLowestChildDeathLevel = this.deathLevel;
-
-			if (this.propagatedLowestChildDeathLevel < this.parent.propagatedLowestChildDeathLevel)
-				this.parent.propagatedLowestChildDeathLevel = this.propagatedLowestChildDeathLevel;
-
-			//If this cluster has no children, it must propagate itself:
-			if (!this.hasChildren) {
-				this.parent.propagatedMixedForConstraints += this.mixedForConstraints;
-				this.parent.propagatedStability+= this.stability;
-				this.parent.propagatedDescendants.add(this);
-			}
-			else if (this.mixedForConstraints > this.propagatedMixedForConstraints)
-			{
-				this.parent.propagatedMixedForConstraints += this.mixedForConstraints;
-				this.parent.propagatedStability+= this.stability;
-				this.parent.propagatedDescendants.add(this);
-			}
-
-			else if (this.mixedForConstraints < this.propagatedMixedForConstraints) {
-				this.parent.propagatedMixedForConstraints += this.propagatedMixedForConstraints;
-				this.parent.propagatedStability+= this.propagatedStability;
-				this.parent.propagatedDescendants.addAll(this.propagatedDescendants);
-			}
-
-			else if (this.mixedForConstraints == this.propagatedMixedForConstraints) 
-			{
-
-				if (this.stability >= this.propagatedStability) {
-					this.parent.propagatedStability+= this.stability;
-					this.parent.propagatedDescendants.add(this);
-				}
-
-				else {
-					this.parent.propagatedMixedForConstraints += this.propagatedMixedForConstraints;
-					this.parent.propagatedStability+= this.propagatedStability;
-					this.parent.propagatedDescendants.addAll(this.propagatedDescendants);
-				}	
-			}	
-		}
-	}	
-
-
-	/**
-	 * @author jadson
-	 * This cluster will propagate itself to its parent if its number of satisfied constraints is
-	 * higher than the number of propagated constraints.  Otherwise, this cluster propagates its
-	 * propagated descendants.  In the case of ties, stability is examined.
-	 * Additionally, this cluster propagates the lowest death level of any of its descendants to its
-	 * parent.
-	 */
-	public void propagateSub(Cluster parent)
-	{
-		if(this.getLabel() != parent.getLabel()) 
+		if (this.parent != null) 
 		{
 
 			//Propagate lowest death level of any descendants:
@@ -381,55 +228,164 @@ public class Cluster implements java.io.Serializable
 				this.parent.propagatedLowestChildDeathLevel = this.propagatedLowestChildDeathLevel;
 
 			//If this cluster has no children, it must propagate itself:
-			if (!this.hasChildren) {
-				this.parent.propagatedNumConstraintsSatisfied+= this.numConstraintsSatisfied;
+			if (!this.hasChildren) 
+			{
+				this.parent.propagatedBCubed += this.bCubed;
 				this.parent.propagatedStability+= this.stability;
 				this.parent.propagatedDescendants.add(this);
 			}
 
-			else if (this.numConstraintsSatisfied > this.propagatedNumConstraintsSatisfied) {
-				this.parent.propagatedNumConstraintsSatisfied+= this.numConstraintsSatisfied;
+			else if (this.bCubed > this.propagatedBCubed) 
+			{
+				this.parent.propagatedBCubed += this.bCubed;
 				this.parent.propagatedStability+= this.stability;
 				this.parent.propagatedDescendants.add(this);
 			}
 
-			else if (this.numConstraintsSatisfied < this.propagatedNumConstraintsSatisfied) {
-				this.parent.propagatedNumConstraintsSatisfied+= this.propagatedNumConstraintsSatisfied;
+			else if (this.bCubed < this.propagatedBCubed) 
+			{
+				this.parent.propagatedBCubed += this.propagatedBCubed;
 				this.parent.propagatedStability+= this.propagatedStability;
 				this.parent.propagatedDescendants.addAll(this.propagatedDescendants);
 			}
-
-			else if (this.numConstraintsSatisfied == this.propagatedNumConstraintsSatisfied) 
+			else if (this.bCubed == this.propagatedBCubed) 
 			{
 
-				if (this.stability >= this.propagatedStability) {
-					this.parent.propagatedNumConstraintsSatisfied+= this.numConstraintsSatisfied;
+				if (this.stability >= this.propagatedStability)
+				{
+					this.parent.propagatedBCubed += this.bCubed;
 					this.parent.propagatedStability+= this.stability;
 					this.parent.propagatedDescendants.add(this);
 				}
 
-				else {
-					this.parent.propagatedNumConstraintsSatisfied+= this.propagatedNumConstraintsSatisfied;
+				else 
+				{
+					this.parent.propagatedBCubed += this.propagatedBCubed;
 					this.parent.propagatedStability+= this.propagatedStability;
 					this.parent.propagatedDescendants.addAll(this.propagatedDescendants);
 				}	
 			}	
-		}else
-		{
-			//Propagate lowest death level of any descendants:
-			if (this.propagatedLowestChildDeathLevel == Double.MAX_VALUE)
-				this.propagatedLowestChildDeathLevel = this.deathLevel;
-
-			if (this.stability >= this.propagatedStability) 
-			{
-				this.propagatedNumConstraintsSatisfied = this.numConstraintsSatisfied;
-				this.propagatedStability= this.stability;
-				this.propagatedDescendants.clear();
-				this.propagatedDescendants.add(this);
-			}
 		}
 	}
 
+
+
+	/**
+	 * Created by Jadson Castro Gertrudes
+	 * This cluster will propagate itself to its parent if its purity index is
+	 * higher or equal than the purity of propagated ones.  Otherwise, this cluster propagates its
+	 * propagated descendants.
+	 */
+
+	public void propagateMixStabilityBCubed()
+	{
+		if (this.parent != null)
+		{
+			//Propagate lowest death level of any descendants:
+			if (this.propagatedLowestChildDeathLevel == Double.MAX_VALUE)
+				this.propagatedLowestChildDeathLevel = this.deathLevel;
+
+			if (this.propagatedLowestChildDeathLevel < this.parent.propagatedLowestChildDeathLevel)
+				this.parent.propagatedLowestChildDeathLevel = this.propagatedLowestChildDeathLevel;
+
+			//If this cluster has no children, it must propagate itself:
+			if (!this.hasChildren) 
+			{
+				this.parent.propagatedMixStabilityBcubed+= this.mixStabilityBcubed;
+				this.parent.propagatedStability+= this.stability;
+				this.parent.propagatedDescendants.add(this);
+			}
+			else if (this.mixStabilityBcubed > this.propagatedMixStabilityBcubed)
+			{
+				this.parent.propagatedMixStabilityBcubed += this.mixStabilityBcubed;
+				this.parent.propagatedStability+= this.stability;
+				this.parent.propagatedDescendants.add(this);
+			}
+
+			else if (this.mixStabilityBcubed < this.propagatedMixStabilityBcubed)
+			{
+				this.parent.propagatedMixStabilityBcubed += this.propagatedMixStabilityBcubed;
+				this.parent.propagatedStability+= this.propagatedStability;
+				this.parent.propagatedDescendants.addAll(this.propagatedDescendants);
+			}
+
+			else if (this.mixStabilityBcubed == this.propagatedMixStabilityBcubed) 
+			{
+
+				if (this.stability >= this.propagatedStability) 
+				{
+					this.parent.propagatedStability+= this.stability;
+					this.parent.propagatedDescendants.add(this);
+				}
+
+				else 
+				{
+					this.parent.propagatedMixStabilityBcubed+= this.propagatedMixStabilityBcubed;
+					this.parent.propagatedStability+= this.propagatedStability;
+					this.parent.propagatedDescendants.addAll(this.propagatedDescendants);
+				}	
+			}	
+		}
+	}	
+
+
+	/**
+	 * Created by Jadson Castro Gertrudes
+	 * This cluster will propagate itself to its parent if its purity index is
+	 * higher or equal than the purity of propagated ones.  Otherwise, this cluster propagates its
+	 * propagated descendants.
+	 * TODO: update function to store the propagated purity and the propagated stability
+	 */
+
+	public void propagateMixStabilityConstraints()
+	{
+		if (this.parent != null) 
+		{
+
+			//Propagate lowest death level of any descendants:
+			if (this.propagatedLowestChildDeathLevel == Double.MAX_VALUE)
+				this.propagatedLowestChildDeathLevel = this.deathLevel;
+
+			if (this.propagatedLowestChildDeathLevel < this.parent.propagatedLowestChildDeathLevel)
+				this.parent.propagatedLowestChildDeathLevel = this.propagatedLowestChildDeathLevel;
+
+			//If this cluster has no children, it must propagate itself:
+			if (!this.hasChildren) 
+			{
+				this.parent.propagatedMixStabilityConstraints += this.mixStabilityConstraints;
+				this.parent.propagatedStability+= this.stability;
+				this.parent.propagatedDescendants.add(this);
+			}
+			else if (this.mixStabilityConstraints > this.propagatedMixStabilityConstraints)
+			{
+				this.parent.propagatedMixStabilityConstraints += this.mixStabilityConstraints;
+				this.parent.propagatedStability+= this.stability;
+				this.parent.propagatedDescendants.add(this);
+			}
+
+			else if (this.mixStabilityConstraints< this.propagatedMixStabilityConstraints) {
+				this.parent.propagatedMixStabilityConstraints += this.propagatedMixStabilityConstraints;
+				this.parent.propagatedStability+= this.propagatedStability;
+				this.parent.propagatedDescendants.addAll(this.propagatedDescendants);
+			}
+
+			else if (this.mixStabilityConstraints == this.propagatedMixStabilityConstraints) 
+			{
+
+				if (this.stability >= this.propagatedStability) 
+				{
+					this.parent.propagatedStability+= this.stability;
+					this.parent.propagatedDescendants.add(this);
+				}
+
+				else{
+					this.parent.propagatedMixStabilityConstraints += this.propagatedMixStabilityConstraints;
+					this.parent.propagatedStability+= this.propagatedStability;
+					this.parent.propagatedDescendants.addAll(this.propagatedDescendants);
+				}	
+			}	
+		}
+	}
 
 	//------------------------------------------------------------------------------
 
@@ -465,14 +421,85 @@ public class Cluster implements java.io.Serializable
 		this.virtualChildCluster = null;
 	}
 
+
 	public void addClassInformation(Entry<Integer, Integer> labeledObject)
 	{
-		if(this.preLabeledObjectsInNode.containsKey(labeledObject.getValue()))
-			this.preLabeledObjectsInNode.get(labeledObject.getValue()).add(labeledObject.getKey());
+		Integer classId = labeledObject.getValue();
+		Integer idObj = labeledObject.getKey();
+
+		this.numberOfLabeledInNode +=1; // update the number of labeled objects in the node
+
+		if(this.classDistributionInNode.containsKey(classId))
+		{
+			int count = classDistributionInNode.get(classId);
+			count += 1;
+			this.classDistributionInNode.put(classId, count);
+		}
 		else
 		{
-			this.preLabeledObjectsInNode.put(labeledObject.getValue(), new TreeSet<Integer>());
-			this.preLabeledObjectsInNode.get(labeledObject.getValue()).add(labeledObject.getKey());
+			this.classDistributionInNode.put(classId, 1);
+		}
+
+		if(this.virtualChildCluster.contains(idObj)) // repeat the same process of a valid cluster
+		{
+
+			if(this.classDistributionInVirtualChild.containsKey(classId))
+			{
+				int count = classDistributionInVirtualChild.get(classId);
+				count += 1;
+				this.classDistributionInVirtualChild.put(classId, count);
+			}
+			else
+			{
+				this.classDistributionInVirtualChild.put(classId, 1);
+			}
+
+		}
+	}
+
+
+	/**
+	 * computeBcubedIndex
+	 * @param totalOfLabeled
+	 * @param classDist
+	 * This method compute the bcubed index given the distribution of labeled objects in the cluster
+	 * It is worth to remember that we will consider each labeled object in the virtual node as a singleton.
+	 * This version considers the minimum/fmeasure between the precision and the recall of each object in the cluster!!!!.
+	 */
+	public void computeBCubedIndex(int totalOfLabeled, TreeMap<Integer, Integer> classDist)
+	{
+		//		System.out.println("Computing BCubed for cluster " + this.label + " total of labeled objects: " + totalOfLabeled + " class distribution: " + this.classDistributionInNode);
+		if(this.classDistributionInNode.isEmpty())
+			return;
+
+		for(Map.Entry<Integer, Integer> entry: this.classDistributionInNode.entrySet())
+		{
+			int totalClassLabel = classDist.get(entry.getKey());
+			int count = entry.getValue();
+			double precisionObject = ((double)count/numberOfLabeledInNode)/totalOfLabeled;
+
+			double recallObject = ((double)count/totalClassLabel)/totalOfLabeled;
+			this.bCubed += count*(2.0/(1.0/precisionObject + 1.0/recallObject)); // F-measure
+
+//			System.out.println(String.format(Locale.CANADA, "Cluster %d, count: %d, precision object: %.3f, recall object: %.3f", this.label, count, precisionObject, recallObject));
+		}
+
+		//		System.out.println("index set for cluster " + this.label + ": "+ String.format(Locale.CANADA, "%.3f", this.bCubed));
+
+		if(!this.classDistributionInVirtualChild.isEmpty() && this.hasChildren) // if the cluster is not a leaf cluster, we need to include the index value of the virtual children
+		{
+//			System.out.println("cluster id: "+this.label+ " Distribution of the virtual child " + classDistributionInVirtualChild);
+
+			for(Map.Entry<Integer, Integer> entry: this.classDistributionInVirtualChild.entrySet())
+			{
+				int count = entry.getValue();
+				int totalClassLabel = classDist.get(entry.getKey());
+
+				double precision = 1.0/totalOfLabeled;
+				double recall = (1.0/totalClassLabel)/totalOfLabeled; 
+				this.propagatedBCubed += count*(2.0/(1.0/precision + 1.0/recall)); // F-measure
+			}
+			//			System.out.println("Including index of virtual node, cluster " + this.label + ", parent  " + this.parent.label + ": "+ String.format(Locale.CANADA, "%.3f", this.propagatedBCubed) + ".");
 		}
 	}
 
@@ -484,19 +511,23 @@ public class Cluster implements java.io.Serializable
 
 		this.numConstraintsSatisfied = 0;
 		this.propagatedNumConstraintsSatisfied = 0;
-		//		this.virtualChildCluster = new TreeSet<Integer>();
 
-		this.consistencyIndex = 0.0;
-		this.propagatedConsistencyIndex = 0.0;
+		this.bCubed = 0.0;
+		this.propagatedBCubed= 0.0;
 
-		this.mixedStability = 0.0;
-		this.propagatedMixedStability=0.0;
-		
-		this.mixedForConstraints = 0.0;
-		this.propagatedMixedForConstraints = 0.0;
+		this.mixStabilityBcubed = 0.0;
+		this.propagatedMixStabilityBcubed=0.0;
 
-		this.preLabeledObjectsInNode = new TreeMap<Integer, TreeSet<Integer>>();
-		this.propagatedDescendants = new ArrayList<Cluster>(1);
+		this.mixStabilityConstraints = 0.0;
+		this.propagatedMixStabilityConstraints = 0.0;
+
+		this.classDistributionInNode = new TreeMap<Integer, Integer>();
+		this.classDistributionInVirtualChild = new TreeMap<Integer, Integer>();
+
+		this.numberOfLabeledInNode = 0;
+		this.propagatedDescendants   = new ArrayList<Cluster>(1);
+
+
 	}
 
 	// ------------------------------ PRIVATE METHODS ------------------------------
@@ -548,40 +579,40 @@ public class Cluster implements java.io.Serializable
 		return this.propagatedNumConstraintsSatisfied;
 	}
 
-	public double getConsistencyIndex()
+	public double getBCubedAtCluster()
 	{
-		return this.consistencyIndex;
+		return this.bCubed;
 	}
 
-	public double getPropagatedConsistencyIndex()
+	public double getPropagatedBCubed()
 	{
-		return this.propagatedConsistencyIndex;
+		return this.propagatedBCubed;
 	}
 
-	public void setConsistencyIndex(double consistency)
+	public void setBCubedPrecision(double bcubed)
 	{
-		this.consistencyIndex = consistency;
+		this.bCubed = bcubed;
 	}
 
-
-	public double getMixedStability()
+	public double getMixStabilityBcubed()
 	{
-		return this.mixedStability;
+		return this.mixStabilityBcubed;
 	}
 
-	public double getPropagatedMixedStability()
+	public double getPropagatedMixdStabilityBcubed()
 	{
-		return this.propagatedMixedStability;
-	}
-	
-	public double getPropagatedMixedForConstraints()
-	{
-		return this.propagatedMixedForConstraints;
+		return this.propagatedMixStabilityBcubed;
 	}
 
-	public void setMixedStability(double alpha, double maxPropagatedStability)
+	public double getPropagatedMixStabilityConstraints()
 	{
-		this.mixedStability = alpha*(this.stability/maxPropagatedStability) + (1-alpha)*(this.consistencyIndex);
+		return this.propagatedMixStabilityConstraints;
+	}
+
+	public void setMixedStability(double alpha, double maxPropagatedStability, double maxBcubed)
+	{
+		this.mixStabilityBcubed = alpha*(this.stability/maxPropagatedStability) + (1-alpha)*(this.bCubed/maxBcubed);
+		this.propagatedMixStabilityBcubed = (1-alpha)*(this.propagatedMixStabilityBcubed/maxBcubed);
 	}
 
 	/**
@@ -595,8 +626,8 @@ public class Cluster implements java.io.Serializable
 	 */
 	public void setMixedForConstraint(double alpha, double maxPropagatedStability, int numOfConstraints)
 	{
-		this.mixedForConstraints= alpha*(this.stability/maxPropagatedStability) + (1-alpha)*((double)this.numConstraintsSatisfied/(2.0 * numOfConstraints));
-		this.propagatedMixedForConstraints = (1-alpha)*((double)this.propagatedNumConstraintsSatisfied/(2.0 * numOfConstraints));
+		this.mixStabilityConstraints= alpha*(this.stability/maxPropagatedStability) + (1-alpha)*((double)this.numConstraintsSatisfied/(2.0 * numOfConstraints));
+		this.propagatedMixStabilityConstraints = (1-alpha)*((double)this.propagatedNumConstraintsSatisfied/(2.0 * numOfConstraints));
 	}
 
 	public ArrayList<Cluster> getPropagatedDescendants() 
@@ -614,11 +645,6 @@ public class Cluster implements java.io.Serializable
 		return this.children;
 	}
 
-	public TreeSet<Integer> getObjectsAtBirthLevel()
-	{
-		return this.objectsAtBirthLevel;
-	}
-
 	public TreeSet<Integer> getObjects()
 	{
 		return this.objects;
@@ -629,16 +655,16 @@ public class Cluster implements java.io.Serializable
 		this.objects = objects;
 	}
 
-	public TreeMap<Integer, TreeSet<Integer>> getClassInformation()
+	public TreeMap<Integer, Integer> getClassDistribution()
 	{
-		return this.preLabeledObjectsInNode;
+		return this.classDistributionInNode;
 	}
 
 	public String toString()
 	{
 		if(this.parent !=null)
-			return "Id: " + this.label + " Parent: " + this.parent.label + " Stability: " + String.format(Locale.ENGLISH, "%.2f", this.stability) + " Constraints: "+ this.numConstraintsSatisfied + " Consistency: " + String.format(Locale.ENGLISH, "%.2f", this.consistencyIndex) + " isLeaf? " + !this.hasChildren + " Children: " + this.children + "(MIX-Const: " + String.format(Locale.ENGLISH, "%.2f", this.mixedForConstraints) + ", Mix-Consist: " + String.format(Locale.ENGLISH, "%.2f", this.mixedStability) + ")";
+			return "\n Id: " + this.label + " Parent: " + this.parent.label + ". label distribution" + this.classDistributionInNode + " virt.Child" + this.classDistributionInVirtualChild + " Stability: " + String.format(Locale.ENGLISH, "%.3f", this.stability) + " Constraints: "+ this.numConstraintsSatisfied + " propagated constraints satisfied: " + this.propagatedNumConstraintsSatisfied + " Local BCubed: " + String.format(Locale.ENGLISH, "%.3f", this.bCubed)+ " Prop. BCubed: " + String.format(Locale.ENGLISH, "%.3f", this.propagatedBCubed) + " isLeaf? " + !this.hasChildren + " Children: " + this.children + "(MIX-Const: " + String.format(Locale.ENGLISH, "%.2f", this.mixStabilityConstraints) + ", Mix-Consist: " + String.format(Locale.ENGLISH, "%.2f", this.mixStabilityBcubed) + ")"+ " Death level: " + this.deathLevel;
 		else
-			return "Id: " + this.label + " Parent: null" + " Stability: " + String.format(Locale.ENGLISH, "%.2f", this.stability)+ " Constraints: "+ this.numConstraintsSatisfied + " Consistency: " + String.format(Locale.ENGLISH, "%.2f", this.consistencyIndex) + " isLeaf? " + !this.hasChildren + " Children: " + this.children + "(MIX-Const: " + String.format(Locale.ENGLISH, "%.2f", this.mixedForConstraints) + ", Mix-Consist: " + String.format(Locale.ENGLISH, "%.2f", this.mixedStability) + ")";
+			return "\n Id: " + this.label + " Parent: null" + ". label distribution" + this.classDistributionInNode + " virt.Child" + this.classDistributionInVirtualChild + " Stability: " + String.format(Locale.ENGLISH, "%.3f", this.stability)+ " Constraints: "+ this.numConstraintsSatisfied + " Local BCubed: " + String.format(Locale.ENGLISH, "%.3f", this.bCubed)+ " Prop. BCubed: " + String.format(Locale.ENGLISH, "%.3f", this.propagatedBCubed) + " isLeaf? " + !this.hasChildren + " Children: " + this.children + "(MIX-Const: " + String.format(Locale.ENGLISH, "%.3f", this.mixStabilityConstraints) + ", Mix-Consist: " + String.format(Locale.ENGLISH, "%.3f", this.mixStabilityBcubed) + ")" + " Death level: " + this.deathLevel;
 	}
 }

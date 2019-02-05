@@ -86,8 +86,8 @@ public class Util {
 	{
 		for(Instance inst: d.getObjects())
 		{
-			inst.setCoreDistance(0.0);
-			inst.setWeight(0.0);
+			inst.setCoreDistance(-1.0);
+			inst.setWeight(-1.0);
 
 			if(clearPreLabeled)
 			{
@@ -115,6 +115,5 @@ public class Util {
 			}
 		}
 	}
-
 
 }

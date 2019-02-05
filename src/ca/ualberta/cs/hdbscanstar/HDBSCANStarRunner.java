@@ -20,7 +20,7 @@ import static ca.ualberta.cs.hdbscanstar.HDBSCANStar.WARNING_MESSAGE;
 
 /**
  * Entry point for the HDBSCAN* algorithm.
- * @author zjullion
+ * @author zjullion 
  */
 public class HDBSCANStarRunner {
 

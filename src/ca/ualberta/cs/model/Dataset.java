@@ -2,6 +2,8 @@ package ca.ualberta.cs.model;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.TreeSet;
 
 import javafx.util.Pair;
@@ -19,10 +21,18 @@ public class Dataset
 {
 
 	private ArrayList<Instance> objects = new ArrayList<Instance>();
+	private Map<Integer, Integer> classDistribution = new HashMap<Integer, Integer>();
 
 	public void addObject(Instance instance)
 	{
-		objects.add(instance);
+		this.objects.add(instance);
+		
+		Integer key = instance.getTrueLabel();
+		
+		if(this.classDistribution.containsKey(key))
+			this.classDistribution.put(key, (this.classDistribution.get(key)+1));
+		else
+			this.classDistribution.put(key, 1);		
 	}
 
 	public Instance[] getObjects()
@@ -32,37 +42,19 @@ public class Dataset
 
 	public int getNumOfClass()
 	{
-		TreeSet<Integer> tmp= new TreeSet<Integer>();
-		for(Instance i: objects)
-		{
-			tmp.add((Integer)i.getTrueLabel());
-		}
-
-		return tmp.size();
+		return this.classDistribution.keySet().size();
 	}
 
 	public TreeSet<Integer> getClassIds()
 	{
-		TreeSet<Integer> tmp= new TreeSet<Integer>();
-
-		for(Instance i: objects)
-		{
-			tmp.add(i.getTrueLabel());
-		}
-		return tmp;
+		return new TreeSet<Integer>(this.classDistribution.keySet());
 	}
-
-	public TreeSet<Integer> getClassLabels()
+	
+	public Map<Integer, Integer> getClassDistribution()
 	{
-		TreeSet<Integer> tmp= new TreeSet<Integer>();
-
-		for(Instance i: objects)
-		{
-			tmp.add(i.getLabel());
-		}
-		return tmp;
+		return this.classDistribution;
 	}
-
+	
 
 	public ArrayList<Neighbor> getNeighbors(Instance instance, DistanceCalculator distance) 
 	{		
@@ -79,6 +71,7 @@ public class Dataset
 
 		return neighbors;
 	}
+	
 
 	public ArrayList<Neighbor> getNeighborsHissclu(Instance instance, DistanceCalculator distance, SemiWeight semi, boolean isWeighted) 
 	{

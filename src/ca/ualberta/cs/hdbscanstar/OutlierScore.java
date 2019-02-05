@@ -4,7 +4,7 @@ package ca.ualberta.cs.hdbscanstar;
  * Simple storage class that keeps the outlier score, core distance, and id (index) for a single point.
  * OutlierScores are sorted in ascending order by outlier score, with core distances used to break
  * outlier score ties, and ids used to break core distance ties.
- * @author zjullion
+ * @author zjullion 
  */
 public class OutlierScore implements Comparable<OutlierScore> {
 

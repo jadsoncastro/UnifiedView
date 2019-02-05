@@ -204,7 +204,7 @@ public class HDBSCANApts implements Serializable
 	}
 
 	/**
-	 * @author jadson
+	 * @author  jadson
 	 * Calculates the all points core distances for each point in the data set (WEIGHTED VERSION)
 	 * @param dataSet A double[][] where index [i][j] indicates the jth attribute of data point i
 	 * @param distanceFunction A DistanceCalculator to compute distances between points
@@ -238,10 +238,10 @@ public class HDBSCANApts implements Serializable
 		return coreDistances;
 	}
 
-	
-	
-	
-	
+
+
+
+
 	/**
 	 * Constructs the minimum spanning tree of mutual reachability distances for the data set, given
 	 * the core distances for each point.
@@ -292,8 +292,8 @@ public class HDBSCANApts implements Serializable
 					continue;
 
 				double distance = distanceFunction.computeDistance(dataSet[currentPoint], dataSet[neighbor]);
-//				double mutualReachabiltiyDistance = ((coreDistances[currentPoint] + coreDistances[neighbor]) /2.0) + distance;
-				
+				//				double mutualReachabiltiyDistance = ((coreDistances[currentPoint] + coreDistances[neighbor]) /2.0) + distance;
+
 				double mutualReachabiltiyDistance = Double.max(coreDistances[currentPoint], coreDistances[neighbor]);
 				mutualReachabiltiyDistance = Double.max(distance, mutualReachabiltiyDistance);
 
@@ -388,7 +388,6 @@ public class HDBSCANApts implements Serializable
 		HashMap<Integer, Pair<Double, Integer>> lastValues = new HashMap<Integer, Pair<Double, Integer>>();
 
 		//If it outputs the .shm file, adding the objects to the structure.
-
 		if((!outType.equals(HDBSCANAptsRunner.VIS_OUT)))
 		{
 			for(int id = 0; id < mst.getNumVertices(); id++)
@@ -419,7 +418,7 @@ public class HDBSCANApts implements Serializable
 		//A list of clusters in the cluster tree, with the 0th cluster (noise) null:
 		ArrayList<Cluster> clusters = new ArrayList<Cluster>();
 		clusters.add(null);
-		clusters.add(new Cluster(1, null, Double.NaN, mst.getNumVertices(), null));
+		clusters.add(new Cluster(1, null, Double.MAX_VALUE, mst.getNumVertices()));
 
 		//Calculate number of constraints satisfied for cluster 1:
 		TreeSet<Integer> clusterOne = new TreeSet<Integer>();
@@ -434,6 +433,8 @@ public class HDBSCANApts implements Serializable
 			double currentEdgeWeight = mst.getEdgeWeightAtIndex(currentEdgeIndex);
 			ArrayList<Cluster> newClusters = new ArrayList<Cluster>();
 
+//			System.err.println(String.format(Locale.CANADA, "Current edge weight %.20f ", currentEdgeWeight));
+
 			//Remove all edges tied with the current edge weight, and store relevant clusters and vertices:
 			while (currentEdgeIndex >= 0 && mst.getEdgeWeightAtIndex(currentEdgeIndex) == currentEdgeWeight)
 			{
@@ -441,6 +442,8 @@ public class HDBSCANApts implements Serializable
 				int secondVertex = mst.getSecondVertexAtIndex(currentEdgeIndex);
 				mst.getEdgeListForVertex(firstVertex).remove((Integer)secondVertex);
 				mst.getEdgeListForVertex(secondVertex).remove((Integer)firstVertex);
+				
+//				System.out.println(String.format(Locale.CANADA, "Removing edge with weight %.20f. First vertex %d, second vertex %d", currentEdgeWeight, firstVertex, secondVertex));
 
 				if (currentClusterLabels[firstVertex] == 0)
 				{
@@ -816,19 +819,19 @@ public class HDBSCANApts implements Serializable
 		{
 			Cluster currentCluster = clustersToExamine.pollLastEntry().getValue();
 
-			switch (approach.toLowerCase())
+			switch (approach)
 			{
 			case "unsupervised":
 				currentCluster.propagate();
 				break;
-			case "supervised":
-				currentCluster.propagateSupervised();
+			case "bcubed":
+				currentCluster.propagateBCubed();
 				break;
-			case "mixed":
-				currentCluster.propagateMixed();
+			case "mixStabilityBcubed":
+				currentCluster.propagateMixStabilityBCubed();
 				break;
-			case "mc":
-				currentCluster.propagateMixedForConstraints();
+			case "mixStabilityConstraint":
+				currentCluster.propagateMixStabilityConstraints();
 				break;
 			default:
 				System.err.println("propagateTree(): Invalid option for stability propagation! ("+ approach +")");
@@ -847,76 +850,6 @@ public class HDBSCANApts implements Serializable
 					clustersToExamine.put(parent.getLabel(), parent);
 					addedToExaminationList.set(parent.getLabel());
 				}	
-			}
-		}
-
-		//		if (infiniteStability)
-		//			System.out.println(WARNING_MESSAGE);
-
-		return infiniteStability;
-	}
-
-
-	/**
-	 * @author jadson
-	 * Propagates the stability, and lowest child death level from each child
-	 * cluster to each parent cluster in the tree, until reach the parent of its subTree
-	 * This method must be called before calling findProminentClusters() or calculateOutlierScores().
-	 * 
-	 * @param clusters A list of Clusters forming a cluster tree
-	 * @param parent A cluster that is the parent of the subtree under analysis.
-	 * @return true if there are any clusters with infinite stability, false otherwise
-	 */
-
-	public static boolean propagateSubTree(ArrayList<Cluster> clusters, Cluster subTreeRoot) 
-	{
-		TreeMap<Integer, Cluster> clustersToExamine = new TreeMap<Integer, Cluster>();
-
-		BitSet addedToExaminationList = new BitSet(clusters.size());
-		boolean infiniteStability = false;
-
-		//Find all leaf clusters in the cluster tree:
-		for (Cluster cluster : clusters) 
-		{
-			if (cluster != null && !cluster.hasChildren())
-			{
-				Cluster tmp = cluster.getParent();
-
-				while(tmp !=null)
-				{
-					if(tmp.getLabel() == subTreeRoot.getLabel())
-					{
-						clustersToExamine.put(cluster.getLabel(), cluster);
-						addedToExaminationList.set(cluster.getLabel());
-						break;
-					}
-					tmp = tmp.getParent();
-				}
-			}
-		}
-
-		//Iterate through every cluster, propagating stability from children to parents:
-		while (!clustersToExamine.isEmpty()) 
-		{
-			Cluster currentCluster = clustersToExamine.pollLastEntry().getValue();
-
-			currentCluster.propagateSub(subTreeRoot);
-
-			if(currentCluster.getLabel() == subTreeRoot.getLabel())
-				break;
-
-			if (currentCluster.getStability() == Double.POSITIVE_INFINITY)
-				infiniteStability = true;
-
-			if (currentCluster.getParent() != null)
-			{
-				Cluster parent = currentCluster.getParent();
-
-				if (!addedToExaminationList.get(parent.getLabel())) 
-				{
-					clustersToExamine.put(parent.getLabel(), parent);
-					addedToExaminationList.set(parent.getLabel());
-				}
 			}
 		}
 
@@ -1226,6 +1159,78 @@ public class HDBSCANApts implements Serializable
 
 
 
+	/** 
+	 * Function included by @author jadson in 13/04/2017
+	 * Calculates the Consistency index for each cluster in the data set.
+	 * @param matrix is the matrix hierarchy
+	 * @param labeledObjects The set of labeled objects provided by the user.
+	 * @param clusters The ArrayList of clusters
+	 * @param numPoints The number of points in the dataset
+	 */
+
+	public static void calculateBCubedIndex(HMatrix matrix, ArrayList<Cluster> clusters, Map<Integer, Integer> labeledObjects)
+	{
+
+		// First step to compute the consistency index: Propagate the labels trough the hierarchy
+		if (labeledObjects == null || labeledObjects.isEmpty())
+			return;
+		
+		
+		
+		TreeMap<Integer, Integer> classDistribution = new TreeMap<Integer, Integer>();	// <Integer, Integer> == <class, count of objects of that class>
+		HashMap<Integer, Integer> idsLastCluster = matrix.getLastClusters();
+
+		for(Map.Entry<Integer, Integer> entry: labeledObjects.entrySet())
+		{
+			Integer classId = entry.getValue();
+			
+			if(classDistribution.containsKey(classId))
+			{
+				int count = classDistribution.get(classId);
+				count += 1;
+				classDistribution.put(classId, count);
+			}
+			else
+				classDistribution.put(classId, 1);
+		}
+
+		for(Map.Entry<Integer, Integer> entry: labeledObjects.entrySet())
+		{
+			Cluster lastCluster = clusters.get(idsLastCluster.get(entry.getKey()));
+			propagateLabel(lastCluster, entry);
+		}
+
+
+
+		for(Cluster c: clusters)
+			if(c!=null)
+				c.computeBCubedIndex(labeledObjects.size(), classDistribution);
+	}
+
+
+	/**
+	 * @author jadson 24/09/2016
+	 * Calculates the mixed stability of a cluster 
+	 * (given the purity and the stability)
+	 * @param clusters ArrayList of Clusters
+	 * @param maxPropagatedStability. The maximum propagated stability in the unsupervised scenario.
+	 * Used to normalize the stability of each cluster into the interval [0,1]
+	 * @param alpha. parameter controling the degree of each measure will contributed in the mixed
+	 * scenario. alpha=0 (Just the consistency measure); alpha=1 (Unsupervised scenario)
+	 */
+
+	public static void calculateAllMixedIndexes(ArrayList<Cluster> clusters, double maxPropagatedStability, double maxBcubed, double alpha)
+	{
+		for(Cluster cluster: clusters)
+		{
+			if(cluster !=null)
+			{
+				cluster.setMixedStability(alpha, maxPropagatedStability, maxBcubed);
+			}
+		}
+	}
+
+
 	/**
 	 * @author jadson 11/06/2017
 	 * Calculates the mixed stability of a cluster 
@@ -1247,12 +1252,9 @@ public class HDBSCANApts implements Serializable
 			}
 		}
 	}
-	
-	
-	
 
 
-	
+
 
 	// ------------------------------ PRIVATE METHODS ------------------------------
 
@@ -1270,14 +1272,15 @@ public class HDBSCANApts implements Serializable
 			int clusterLabel, double edgeWeight) 
 	{
 
-		for (int point : points) {
+		for (int point : points) 
+		{
 			clusterLabels[point] = clusterLabel;
 		}
 		parentCluster.detachPoints(points.size(), edgeWeight);
 
 		if (clusterLabel != 0)
 		{
-			Cluster cluster = new Cluster(clusterLabel, parentCluster, edgeWeight, points.size(), points);
+			Cluster cluster = new Cluster(clusterLabel, parentCluster, edgeWeight, points.size());
 			parentCluster.addChild(cluster.getLabel());
 			cluster.setObjects(points);
 			return cluster;
@@ -1344,221 +1347,33 @@ public class HDBSCANApts implements Serializable
 			}
 		}
 
-		for (Cluster parent : parents) {
-			parent.releaseVirtualChildCluster();
-		}
+		// Commented by Jadson in 14/03/2018
+		//		for (Cluster parent : parents) {
+		//			parent.releaseVirtualChildCluster();
+		//		}
 	}
 
-	private static int minVertex (double [] dist, BitSet v) 
+	/**
+	 * propagateLabel
+	 * this function propagates the class of the labeled objects
+	 * through the hierarchy.
+	 * @param cluster
+	 * @param labeledObject
+	 */
+	private static void propagateLabel(Cluster cluster, Entry<Integer, Integer> labeledObject)
 	{
-		double x = Double.MAX_VALUE;
-		int y = -1;   // graph not connected, or no unvisited vertices
+		Cluster c = cluster;
 
-		for (int i=0; i<dist.length; i++) 
+		while(c!=null)
 		{
-			if (!v.get(i) && dist[i] < x) {y=i; x=dist[i];}
+			c.addClassInformation(labeledObject);
+			c = c.getParent();
+
 		}
-		return y;
 	}
 
 	// ------------------------------------ 30/05/2017 compute sub cluster tree ------------------------------------------------------------
 
-	/**
-	 * @author jadson
-	 * Compute the cluster tree given a connected component obtained in the MST provided by HDBSCAN*
-	 * @param mst A minimum spanning tree which has been sorted by edge weight in descending order
-	 * @param minClusterSize The minimum number of points which a cluster needs to be a valid cluster
-	 * @return The cluster tree
-	 */
-	private static ArrayList<Cluster> computeSubTree(UndirectedGraph mst, int minClusterSize)
-	{
-		long hierarchyCharsWritten = 0;
-
-		//The current edge being removed from the MST:
-		int currentEdgeIndex = mst.getNumEdges()-1;
-		int nextClusterLabel = 2;
-		boolean nextLevelSignificant = true;
-
-		//The previous and current cluster numbers of each point in the data set:
-		int[] previousClusterLabels = new int[mst.getNumVertices()];
-		int[] currentClusterLabels = new int[mst.getNumVertices()];
-		for (int i = 0; i < currentClusterLabels.length; i++) 
-		{
-			currentClusterLabels[i] = 1;
-			previousClusterLabels[i] = 1;
-		}
-
-		//A list of clusters in the cluster tree, with the 0th cluster (noise) null:
-		ArrayList<Cluster> clusters = new ArrayList<Cluster>();
-		clusters.add(null);
-		clusters.add(new Cluster(1, null, mst.getEdgeWeightAtIndex(currentEdgeIndex), mst.getNumVertices(), null));
-
-		//Calculate number of constraints satisfied for cluster 1:
-		TreeSet<Integer> clusterOne = new TreeSet<Integer>();
-		clusterOne.add(1);
-
-		//Sets for the clusters and vertices that are affected by the edge(s) being removed:
-		TreeSet<Integer> affectedClusterLabels = new TreeSet<Integer>();
-		TreeSet<Integer> affectedVertices = new TreeSet<Integer>();
-
-		while(currentEdgeIndex >= 0) {
-			double currentEdgeWeight = mst.getEdgeWeightAtIndex(currentEdgeIndex);
-			ArrayList<Cluster> newClusters = new ArrayList<Cluster>();
-
-			//Remove all edges tied with the current edge weight, and store relevant clusters and vertices:
-			while (currentEdgeIndex >= 0 && mst.getEdgeWeightAtIndex(currentEdgeIndex) == currentEdgeWeight)
-			{
-				int firstVertex = mst.getFirstVertexAtIndex(currentEdgeIndex);
-				int secondVertex = mst.getSecondVertexAtIndex(currentEdgeIndex);
-				mst.getEdgeListForVertex(firstVertex).remove((Integer)secondVertex);
-				mst.getEdgeListForVertex(secondVertex).remove((Integer)firstVertex);
-
-				if (currentClusterLabels[firstVertex] == 0)
-				{
-					currentEdgeIndex--;
-					continue;
-				}
-
-				affectedVertices.add(firstVertex);
-				affectedVertices.add(secondVertex);
-				affectedClusterLabels.add(currentClusterLabels[firstVertex]);
-				currentEdgeIndex--;
-			}
-
-			if (affectedClusterLabels.isEmpty())
-				continue;
-
-			//Check each cluster affected for a possible split:
-			while (!affectedClusterLabels.isEmpty()) {
-				int examinedClusterLabel = affectedClusterLabels.last();
-				affectedClusterLabels.remove(examinedClusterLabel);
-				TreeSet<Integer> examinedVertices = new TreeSet<Integer>();
-
-				//Get all affected vertices that are members of the cluster currently being examined:
-				Iterator<Integer> vertexIterator = affectedVertices.iterator();
-				while (vertexIterator.hasNext()) {
-					int vertex = vertexIterator.next();
-
-					if (currentClusterLabels[vertex] == examinedClusterLabel) {
-						examinedVertices.add(vertex);
-						vertexIterator.remove();
-					}
-				}
-
-				TreeSet<Integer> firstChildCluster = null;
-				LinkedList<Integer> unexploredFirstChildClusterPoints = null;
-				int numChildClusters = 0;
-
-				/*
-				 * Check if the cluster has split or shrunk by exploring the graph from each affected
-				 * vertex.  If there are two or more valid child clusters (each has >= minClusterSize
-				 * points), the cluster has split.
-				 * Note that firstChildCluster will only be fully explored if there is a cluster
-				 * split, otherwise, only spurious components are fully explored, in order to label 
-				 * them noise.
-				 */
-				while (!examinedVertices.isEmpty()) {
-					TreeSet<Integer> constructingSubCluster = new TreeSet<Integer>();
-					LinkedList<Integer> unexploredSubClusterPoints = new LinkedList<Integer>();
-					boolean anyEdges = false;
-					boolean incrementedChildCount = false;
-
-					int rootVertex = examinedVertices.last();
-					constructingSubCluster.add(rootVertex);
-					unexploredSubClusterPoints.add(rootVertex);
-					examinedVertices.remove(rootVertex);
-
-					//Explore this potential child cluster as long as there are unexplored points:
-					while (!unexploredSubClusterPoints.isEmpty()) {
-						int vertexToExplore = unexploredSubClusterPoints.poll();
-
-						for (int neighbor : mst.getEdgeListForVertex(vertexToExplore)) {
-							anyEdges = true;
-							if (constructingSubCluster.add(neighbor)) {
-								unexploredSubClusterPoints.add(neighbor);
-								examinedVertices.remove(neighbor);
-							}	
-						}
-
-						//Check if this potential child cluster is a valid cluster:
-						if (!incrementedChildCount && constructingSubCluster.size() >= minClusterSize && anyEdges ) {
-							incrementedChildCount = true;
-							numChildClusters++;
-
-							//If this is the first valid child cluster, stop exploring it:
-							if (firstChildCluster == null) {
-								firstChildCluster = constructingSubCluster;
-								unexploredFirstChildClusterPoints = unexploredSubClusterPoints;
-								break;
-							}	
-						}
-					}
-
-					//If there could be a split, and this child cluster is valid:
-					if (numChildClusters >= 2 && constructingSubCluster.size() >= minClusterSize && anyEdges ) {
-
-						//Check this child cluster is not equal to the unexplored first child cluster:
-						int firstChildClusterMember = firstChildCluster.last();
-						if (constructingSubCluster.contains(firstChildClusterMember))
-							numChildClusters--;
-
-						//Otherwise, create a new cluster:
-						else {
-							Cluster newCluster = createNewCluster(constructingSubCluster, currentClusterLabels, 
-									clusters.get(examinedClusterLabel), nextClusterLabel, currentEdgeWeight);
-							newClusters.add(newCluster);
-							clusters.add(newCluster);
-							nextClusterLabel++;
-						}	
-					}
-
-					//If this child cluster is not valid cluster, assign it to noise:
-					else if (constructingSubCluster.size() < minClusterSize || !anyEdges){
-						createNewCluster(constructingSubCluster, currentClusterLabels, 
-								clusters.get(examinedClusterLabel), 0, currentEdgeWeight);
-					}
-				}
-
-				//Finish exploring and cluster the first child cluster if there was a split and it was not already clustered:
-				if (numChildClusters >= 2 && currentClusterLabels[firstChildCluster.first()] == examinedClusterLabel) {
-
-					while (!unexploredFirstChildClusterPoints.isEmpty()) {
-						int vertexToExplore = unexploredFirstChildClusterPoints.poll();
-
-						for (int neighbor : mst.getEdgeListForVertex(vertexToExplore)) {
-							if (firstChildCluster.add(neighbor))
-								unexploredFirstChildClusterPoints.add(neighbor);
-						}
-					}
-
-					Cluster newCluster = createNewCluster(firstChildCluster, currentClusterLabels, 
-							clusters.get(examinedClusterLabel), nextClusterLabel, currentEdgeWeight);
-					newClusters.add(newCluster);
-					clusters.add(newCluster);
-					nextClusterLabel++;
-				}
-			}
-
-			//Assign file offsets and calculate the number of constraints satisfied:
-			TreeSet<Integer> newClusterLabels = new TreeSet<Integer>();
-			for (Cluster newCluster : newClusters) {
-				newCluster.setFileOffset(hierarchyCharsWritten);
-				newClusterLabels.add(newCluster.getLabel());
-			}
-
-			for (int i = 0; i < previousClusterLabels.length; i++) {
-				previousClusterLabels[i] = currentClusterLabels[i];
-			}
-
-			if (newClusters.isEmpty())
-				nextLevelSignificant = false;
-			else
-				nextLevelSignificant = true;
-		}
-
-		return clusters;
-	}
-	// ------------------------------------ end: compute sub cluster tree ------------------------------------------------------------------
 
 
 	// ------------------------------ GETTERS & SETTERS ------------------------------
