@@ -1,2 +1,3 @@
-# UnifiedView
-Unified Framework of Density-based Clustering for Semi-supervised Classification
+# Supplementary Material
+
+A Unified View of Density-based Methods for Semi-Supervised Clustering and Classification
